@@ -3,158 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Store Mini App</title>
+    <title>Z1KROV SHOP</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
         :root {
-            --bg: var(--tg-theme-bg-color, #fff);
-            --text: var(--tg-theme-text-color, #000);
-            --hint: var(--tg-theme-hint-color, #999);
-            --button: var(--tg-theme-button-color, #248bed);
-            --button-text: var(--tg-theme-button-text-color, #fff);
+            --bg: var(--tg-theme-bg-color, #ffffff);
+            --text: var(--tg-theme-text-color, #000000);
+            --hint: var(--tg-theme-hint-color, #707579);
+            --btn: var(--tg-theme-button-color, #248bed);
+            --btn-text: var(--tg-theme-button-text-color, #ffffff);
         }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
-        .tab-nav { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 1px solid var(--hint); padding-bottom: 10px; }
-        .tab-nav span { cursor: pointer; font-weight: bold; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        .nav { display: flex; justify-content: space-around; padding: 15px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: var(--bg); z-index: 10; }
+        .nav span { cursor: pointer; font-weight: 600; opacity: 0.7; }
+        .nav span.active { opacity: 1; color: var(--btn); border-bottom: 2px solid var(--btn); }
         
-        .card { border: 1px solid var(--hint); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
-        .price { color: var(--button); font-weight: bold; font-size: 1.2em; }
+        .container { padding: 15px; }
+        .cat-list { display: flex; overflow-x: auto; gap: 8px; margin-bottom: 15px; padding-bottom: 5px; }
+        .cat-chip { background: #f0f0f0; padding: 6px 15px; border-radius: 20px; font-size: 14px; white-space: nowrap; color: #000; }
+        .cat-chip.active { background: var(--btn); color: white; }
+
+        .card { border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 12px; background: rgba(0,0,0,0.02); }
+        .price { color: var(--btn); font-weight: bold; font-size: 1.2em; margin: 8px 0; }
         
-        button { background: var(--button); color: var(--button-text); border: none; padding: 12px; width: 100%; border-radius: 8px; font-weight: bold; margin-top: 10px; }
-        input { width: 90%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid var(--hint); background: var(--bg); color: var(--text); }
-        
+        button { background: var(--btn); color: var(--btn-text); border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; }
         .hidden { display: none; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; }
-        .modal-content { background: var(--bg); padding: 20px; border-radius: 15px; width: 80%; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="tab-nav">
-    <span onclick="showPage('shop')">Магазин</span>
-    <span onclick="showPage('profile')">Профиль</span>
-    <span onclick="showPage('admin')" id="admin-btn" class="hidden">Админ</span>
+<div class="nav">
+    <span id="tab-shop" class="active" onclick="showPage('shop')">Магазин</span>
+    <span id="tab-profile" onclick="showPage('profile')">Профиль</span>
+    <span id="tab-admin" class="hidden" onclick="showPage('admin')">Админ</span>
 </div>
 
-<div id="shop-page">
-    <div id="product-list"></div>
-</div>
+<div class="container">
+    <div id="page-shop">
+        <div class="cat-list" id="cat-container"></div>
+        <div id="prod-container">Загрузка товаров...</div>
+    </div>
 
-<div id="profile-page" class="hidden">
-    <h3>Мои заказы</h3>
-    <div id="order-history"></div>
-</div>
+    <div id="page-profile" class="hidden">
+        <h3>История заказов</h3>
+        <div id="history-container">Здесь будут ваши покупки</div>
+    </div>
 
-<div id="admin-page" class="hidden">
-    <h3>Добавить товар</h3>
-    <input type="text" id="p-name" placeholder="Название товара">
-    <input type="number" id="p-price" placeholder="Цена (USDT)">
-    <input type="text" id="p-cat" placeholder="Группа/Категория">
-    <button onclick="saveProduct()">Сохранить товар</button>
-</div>
-
-<div id="payment-modal" class="modal hidden">
-    <div class="modal-content">
-        <h4>Оплата по реквизитам</h4>
-        <p>Переведите сумму на кошелек (USDT TRC-20):</p>
-        <code id="wallet-address" style="word-break: break-all; color: var(--button);">TYourCryptoWalletAddressHere12345</code>
-        <button onclick="copyWallet()">Копировать адрес</button>
-        <button style="background: #4caf50;" onclick="confirmPayment()">Я оплатил(а)</button>
-        <button style="background: #f44336;" onclick="closePayment()">Отмена</button>
+    <div id="page-admin" class="hidden">
+        <h3>Добавить новый товар</h3>
+        <input type="text" id="adm-name" placeholder="Название товара">
+        <input type="number" id="adm-price" placeholder="Цена (USDT)">
+        <input type="text" id="adm-cat" placeholder="Категория (Группа)">
+        <button onclick="dbSave()">Опубликовать для всех</button>
     </div>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
-    const ADMIN_USERNAME = "z1krov"; // ВАЖНО: поменяй на свой
-    const MY_WALLET = "TYourCryptoWalletAddressHere12345"; // Твой крипто-кошелек
+    const MY_USERNAME = "z1krov"; 
 
-    let products = JSON.parse(localStorage.getItem('products')) || [];
-    let orders = JSON.parse(localStorage.getItem('orders')) || [];
-    let currentOrder = null;
+    // ВСТАВЬ СВОИ ДАННЫЕ ИЗ FIREBASE СЮДА
+    const firebaseConfig = {
+        apiKey: "AIzaSyBrsn0q_GE7gTxScGlQcLBzAH34uqr26qo",
+        authDomain: "shop24344-fa75f.firebaseapp.com", // замени PROJECT_ID
+        projectId: "shop24344-fa75f",                  // замени PROJECT_ID
+        storageBucket: "shop24344-fa75f.firebasestorage.app",   // замени PROJECT_ID
+        appId: "1:775096639365:web:78e6798f636945d8b66eec"                           // замени APP_ID
+    };
 
-    // Показываем админку только владельцу (по желанию можно просто оставить кнопку)
-    if (tg.initDataUnsafe?.user?.username === ADMIN_USERNAME) {
-        document.getElementById('admin-btn').classList.remove('hidden');
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Проверка админа
+    if (tg.initDataUnsafe?.user?.username === MY_USERNAME) {
+        document.getElementById('tab-admin').classList.remove('hidden');
     }
 
     function showPage(page) {
         ['shop', 'profile', 'admin'].forEach(p => {
-            document.getElementById(`${p}-page`).classList.toggle('hidden', p !== page);
+            document.getElementById('page-' + p).classList.toggle('hidden', p !== page);
+            document.getElementById('tab-' + p).classList.toggle('active', p === page);
         });
-        if(page === 'shop') renderProducts();
-        if(page === 'profile') renderOrders();
+        if (page === 'profile') renderHistory();
     }
 
-    function renderProducts() {
-        const list = document.getElementById('product-list');
-        list.innerHTML = products.length ? '' : 'Товаров пока нет.';
-        products.forEach((p, index) => {
-            list.innerHTML += `
-                <div class="card">
-                    <b>[${p.cat}]</b><br>
-                    <strong>${p.name}</strong><br>
-                    <span class="price">${p.price} USDT</span>
-                    <button onclick="openPayment(${index})">Купить</button>
-                </div>`;
-        });
+    // Сохранение в базу (Админ)
+    async function dbSave() {
+        const name = document.getElementById('adm-name').value;
+        const price = document.getElementById('adm-price').value;
+        const cat = document.getElementById('adm-cat').value;
+
+        if (name && price && cat) {
+            await db.collection("products").add({ name, price: Number(price), cat });
+            alert("Товар добавлен!");
+            document.getElementById('adm-name').value = '';
+            document.getElementById('adm-price').value = '';
+            showPage('shop');
+        }
     }
 
-    function saveProduct() {
-        const name = document.getElementById('p-name').value;
-        const price = document.getElementById('p-price').value;
-        const cat = document.getElementById('p-cat').value;
-        if(!name || !price) return alert('Заполни поля');
-        
-        products.push({name, price, cat});
-        localStorage.setItem('products', JSON.stringify(products));
-        alert('Товар добавлен!');
-        showPage('shop');
-    }
-
-    function openPayment(index) {
-        currentOrder = products[index];
-        document.getElementById('payment-modal').classList.remove('hidden');
-    }
-
-    function closePayment() {
-        document.getElementById('payment-modal').classList.add('hidden');
-    }
-
-    function copyWallet() {
-        navigator.clipboard.writeText(MY_WALLET);
-        alert('Адрес скопирован!');
-    }
-
-    function confirmPayment() {
-        const orderInfo = {
-            ...currentOrder,
-            date: new Date().toLocaleString()
-        };
-        orders.push(orderInfo);
-        localStorage.setItem('orders', JSON.stringify(orders));
-
-        // Формируем ссылку в ЛС админу
-        const text = `Заявка на покупку!\nТовар: ${orderInfo.name}\nСумма: ${orderInfo.price} USDT\nЯ оплатил, проверьте перевод.`;
-        const url = `https://t.me/${ADMIN_USERNAME}?text=${encodeURIComponent(text)}`;
-        
-        tg.openTelegramLink(url);
-        closePayment();
-        showPage('profile');
-    }
-
-    function renderOrders() {
-        const list = document.getElementById('order-history');
-        list.innerHTML = orders.length ? '' : 'История пуста.';
-        orders.forEach(o => {
-            list.innerHTML += `<div class="card" style="opacity: 0.8; font-size: 0.9em;">
-                ${o.date}<br><b>${o.name}</b> - ${o.price} USDT
-            </div>`;
+    // Загрузка товаров
+    function loadData() {
+        db.collection("products").onSnapshot((snapshot) => {
+            const prods = [];
+            const cats = new Set(["Все"]);
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                prods.push(data);
+                cats.add(data.cat);
+            });
+            renderCats(Array.from(cats));
+            renderProds(prods);
         });
     }
 
-    renderProducts();
-    tg.ready();
+    function renderCats(cats) {
+        const container = document.getElementById('cat-container');
+        container.innerHTML = cats.map(c => `<div class="cat-chip" onclick="filterBy('${c}')">${c}</div>`).join('');
+    }
+
+    function renderProds(list) {
+        const container = document.getElementById('prod-container');
+        container.innerHTML = list.map(p => `
+            <div class="card">
+                <small>${p.cat}</small>
+                <div style="font-weight:bold; margin-top:4px;">${p.name}</div>
+                <div class="price">${p.price} USDT</div>
+                <button onclick="buyAction('${p.name}', ${p.price})">Купить</button>
+            </div>
+        `).join('');
+        window.allProds = list;
+    }
+
+    function filterBy(cat) {
+        if (cat === "Все") renderProds(window.allProds);
+        else renderProds(window.allProds.filter(p => p.cat === cat));
+    }
+
+    function buyAction(name, price) {
+        // Сохраняем в локальную историю
+        let orders = JSON.parse(localStorage.getItem('my_orders') || "[]");
+        orders.push({ name, price, date: new Date().toLocaleDateString() });
+        localStorage.setItem('my_orders', JSON.stringify(orders));
+
+        // Ссылка в ЛС к тебе
+        const text = `Привет z1krov! Купил товар: ${name}. Сумма: ${price} USDT. Проверь оплату.`;
+        tg.openTelegramLink(`https://t.me/${MY_USERNAME}?text=${encodeURIComponent(text)}`);
+    }
+
+    function renderHistory() {
+        const orders = JSON.parse(localStorage.getItem('my_orders') || "[]");
+        const container = document.getElementById('history-container');
+        if (orders.length === 0) return;
+        container.innerHTML = orders.reverse().map(o => `
+            <div style="padding:10px; border-bottom:1px solid #eee;">
+                <b>${o.name}</b><br><small>${o.date} — ${o.price} USDT</small>
+            </div>
+        `).join('');
+    }
+
+    loadData();
+    tg.expand();
 </script>
 </body>
 </html>
