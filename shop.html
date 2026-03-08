@@ -1,70 +1,160 @@
-# Пример упрощенной логики на aiogram
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.types import LabeledPrice, PreCheckoutQuery
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Store Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg: var(--tg-theme-bg-color, #fff);
+            --text: var(--tg-theme-text-color, #000);
+            --hint: var(--tg-theme-hint-color, #999);
+            --button: var(--tg-theme-button-color, #248bed);
+            --button-text: var(--tg-theme-button-text-color, #fff);
+        }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+        .tab-nav { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 1px solid var(--hint); padding-bottom: 10px; }
+        .tab-nav span { cursor: pointer; font-weight: bold; }
+        
+        .card { border: 1px solid var(--hint); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .price { color: var(--button); font-weight: bold; font-size: 1.2em; }
+        
+        button { background: var(--button); color: var(--button-text); border: none; padding: 12px; width: 100%; border-radius: 8px; font-weight: bold; margin-top: 10px; }
+        input { width: 90%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid var(--hint); background: var(--bg); color: var(--text); }
+        
+        .hidden { display: none; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: var(--bg); padding: 20px; border-radius: 15px; width: 80%; text-align: center; }
+    </style>
+</head>
+<body>
 
-API_TOKEN = '8361430313:AAEcJ_7ttEYDzvbOFFpTZnpECrKK2sCIarw'
-ADMIN_ID = 1577146268  # Твой ID
+<div class="tab-nav">
+    <span onclick="showPage('shop')">Магазин</span>
+    <span onclick="showPage('profile')">Профиль</span>
+    <span onclick="showPage('admin')" id="admin-btn" class="hidden">Админ</span>
+</div>
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
+<div id="shop-page">
+    <div id="product-list"></div>
+</div>
 
-# --- КЛИЕНТСКАЯ ЧАСТЬ ---
+<div id="profile-page" class="hidden">
+    <h3>Мои заказы</h3>
+    <div id="order-history"></div>
+</div>
 
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    # Кнопка для открытия Mini App
-    kb = [
-        [types.KeyboardButton(text="Открыть магазин", web_app=types.WebAppInfo(url="https://your-app-url.com"))],
-        [types.KeyboardButton(text="Мой профиль")]
-    ]
-    keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-    await message.answer("Добро пожаловать! Выберите действие:", reply_markup=keyboard)
+<div id="admin-page" class="hidden">
+    <h3>Добавить товар</h3>
+    <input type="text" id="p-name" placeholder="Название товара">
+    <input type="number" id="p-price" placeholder="Цена (USDT)">
+    <input type="text" id="p-cat" placeholder="Группа/Категория">
+    <button onclick="saveProduct()">Сохранить товар</button>
+</div>
 
-@dp.message(F.text == "Мой профиль")
-async def profile(message: types.Message):
-    # Здесь должен быть запрос в БД к таблице Orders
-    history = "Ваши заказы:\n1. Товар А - 500р\n2. Товар Б - 1000р" 
-    await message.answer(f"👤 Профиль\n\n{history}")
+<div id="payment-modal" class="modal hidden">
+    <div class="modal-content">
+        <h4>Оплата по реквизитам</h4>
+        <p>Переведите сумму на кошелек (USDT TRC-20):</p>
+        <code id="wallet-address" style="word-break: break-all; color: var(--button);">TYourCryptoWalletAddressHere12345</code>
+        <button onclick="copyWallet()">Копировать адрес</button>
+        <button style="background: #4caf50;" onclick="confirmPayment()">Я оплатил(а)</button>
+        <button style="background: #f44336;" onclick="closePayment()">Отмена</button>
+    </div>
+</div>
 
-# --- ОПЛАТА ---
+<script>
+    const tg = window.Telegram.WebApp;
+    const ADMIN_USERNAME = "ТВОЙ_НИК_БЕЗ_СОБАЧКИ"; // ВАЖНО: поменяй на свой
+    const MY_WALLET = "TYourCryptoWalletAddressHere12345"; // Твой крипто-кошелек
 
-@dp.message(F.text == "Купить")
-async def send_invoice(message: types.Message):
-    prices = [LabeledPrice(label="Товар", amount=100000)] # 1000.00 руб
-    await bot.send_invoice(
-        message.chat.id,
-        title="Покупка товара",
-        description="Описание",
-        provider_token="PAYMENT_PROVIDER_TOKEN",
-        currency="rub",
-        prices=prices,
-        payload="test-payload"
-    )
+    let products = JSON.parse(localStorage.getItem('products')) || [];
+    let orders = JSON.parse(localStorage.getItem('orders')) || [];
+    let currentOrder = null;
 
-@dp.pre_checkout_query()
-async def process_pre_checkout(pre_checkout_query: PreCheckoutQuery):
-    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+    // Показываем админку только владельцу (по желанию можно просто оставить кнопку)
+    if (tg.initDataUnsafe?.user?.username === ADMIN_USERNAME) {
+        document.getElementById('admin-btn').classList.remove('hidden');
+    }
 
-@dp.successful_payment()
-async def success_payment(message: types.Message):
-    # Логика после оплаты
-    amount = message.successful_payment.total_amount / 100
-    item = message.successful_payment.invoice_payload
-    
-    # Ссылка на тебя с заготовленным текстом
-    admin_username = "твой_юзернейм"
-    text = f"Привет! Я купил {item} на сумму {amount} руб. Вот мой чек."
-    url = f"https://t.me/{admin_username}?text={text.replace(' ', '%20')}"
-    
-    kb = [[types.InlineKeyboardButton(text="Связаться с админом", url=url)]]
-    markup = types.InlineKeyboardMarkup(inline_keyboard=kb)
-    
-    await message.answer("✅ Оплата прошла успешно! Нажмите кнопку ниже, чтобы отправить данные админу.", reply_markup=markup)
+    function showPage(page) {
+        ['shop', 'profile', 'admin'].forEach(p => {
+            document.getElementById(`${p}-page`).classList.toggle('hidden', p !== page);
+        });
+        if(page === 'shop') renderProducts();
+        if(page === 'profile') renderOrders();
+    }
 
-# --- АДМИНКА (упрощенно) ---
+    function renderProducts() {
+        const list = document.getElementById('product-list');
+        list.innerHTML = products.length ? '' : 'Товаров пока нет.';
+        products.forEach((p, index) => {
+            list.innerHTML += `
+                <div class="card">
+                    <b>[${p.cat}]</b><br>
+                    <strong>${p.name}</strong><br>
+                    <span class="price">${p.price} USDT</span>
+                    <button onclick="openPayment(${index})">Купить</button>
+                </div>`;
+        });
+    }
 
-@dp.message(Command("admin"))
-async def admin_panel(message: types.Message):
-    if message.from_user.id == ADMIN_ID:
-        await message.answer("🔧 Админ-панель\n1. Добавить категорию\n2. Добавить товар")
+    function saveProduct() {
+        const name = document.getElementById('p-name').value;
+        const price = document.getElementById('p-price').value;
+        const cat = document.getElementById('p-cat').value;
+        if(!name || !price) return alert('Заполни поля');
+        
+        products.push({name, price, cat});
+        localStorage.setItem('products', JSON.stringify(products));
+        alert('Товар добавлен!');
+        showPage('shop');
+    }
+
+    function openPayment(index) {
+        currentOrder = products[index];
+        document.getElementById('payment-modal').classList.remove('hidden');
+    }
+
+    function closePayment() {
+        document.getElementById('payment-modal').classList.add('hidden');
+    }
+
+    function copyWallet() {
+        navigator.clipboard.writeText(MY_WALLET);
+        alert('Адрес скопирован!');
+    }
+
+    function confirmPayment() {
+        const orderInfo = {
+            ...currentOrder,
+            date: new Date().toLocaleString()
+        };
+        orders.push(orderInfo);
+        localStorage.setItem('orders', JSON.stringify(orders));
+
+        // Формируем ссылку в ЛС админу
+        const text = `Заявка на покупку!\nТовар: ${orderInfo.name}\nСумма: ${orderInfo.price} USDT\nЯ оплатил, проверьте перевод.`;
+        const url = `https://t.me/${ADMIN_USERNAME}?text=${encodeURIComponent(text)}`;
+        
+        tg.openTelegramLink(url);
+        closePayment();
+        showPage('profile');
+    }
+
+    function renderOrders() {
+        const list = document.getElementById('order-history');
+        list.innerHTML = orders.length ? '' : 'История пуста.';
+        orders.forEach(o => {
+            list.innerHTML += `<div class="card" style="opacity: 0.8; font-size: 0.9em;">
+                ${o.date}<br><b>${o.name}</b> - ${o.price} USDT
+            </div>`;
+        });
+    }
+
+    renderProducts();
+    tg.ready();
+</script>
+</body>
+</html>
