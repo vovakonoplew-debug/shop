@@ -1,0 +1,70 @@
+# Пример упрощенной логики на aiogram
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import LabeledPrice, PreCheckoutQuery
+
+API_TOKEN = '8361430313:AAEcJ_7ttEYDzvbOFFpTZnpECrKK2sCIarw'
+ADMIN_ID = 1577146268  # Твой ID
+
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
+
+# --- КЛИЕНТСКАЯ ЧАСТЬ ---
+
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    # Кнопка для открытия Mini App
+    kb = [
+        [types.KeyboardButton(text="Открыть магазин", web_app=types.WebAppInfo(url="https://your-app-url.com"))],
+        [types.KeyboardButton(text="Мой профиль")]
+    ]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+    await message.answer("Добро пожаловать! Выберите действие:", reply_markup=keyboard)
+
+@dp.message(F.text == "Мой профиль")
+async def profile(message: types.Message):
+    # Здесь должен быть запрос в БД к таблице Orders
+    history = "Ваши заказы:\n1. Товар А - 500р\n2. Товар Б - 1000р" 
+    await message.answer(f"👤 Профиль\n\n{history}")
+
+# --- ОПЛАТА ---
+
+@dp.message(F.text == "Купить")
+async def send_invoice(message: types.Message):
+    prices = [LabeledPrice(label="Товар", amount=100000)] # 1000.00 руб
+    await bot.send_invoice(
+        message.chat.id,
+        title="Покупка товара",
+        description="Описание",
+        provider_token="PAYMENT_PROVIDER_TOKEN",
+        currency="rub",
+        prices=prices,
+        payload="test-payload"
+    )
+
+@dp.pre_checkout_query()
+async def process_pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+@dp.successful_payment()
+async def success_payment(message: types.Message):
+    # Логика после оплаты
+    amount = message.successful_payment.total_amount / 100
+    item = message.successful_payment.invoice_payload
+    
+    # Ссылка на тебя с заготовленным текстом
+    admin_username = "твой_юзернейм"
+    text = f"Привет! Я купил {item} на сумму {amount} руб. Вот мой чек."
+    url = f"https://t.me/{admin_username}?text={text.replace(' ', '%20')}"
+    
+    kb = [[types.InlineKeyboardButton(text="Связаться с админом", url=url)]]
+    markup = types.InlineKeyboardMarkup(inline_keyboard=kb)
+    
+    await message.answer("✅ Оплата прошла успешно! Нажмите кнопку ниже, чтобы отправить данные админу.", reply_markup=markup)
+
+# --- АДМИНКА (упрощенно) ---
+
+@dp.message(Command("admin"))
+async def admin_panel(message: types.Message):
+    if message.from_user.id == ADMIN_ID:
+        await message.answer("🔧 Админ-панель\n1. Добавить категорию\n2. Добавить товар")
