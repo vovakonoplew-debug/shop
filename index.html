@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Z1KROV SHOP</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -10,163 +10,266 @@
     <style>
         :root {
             --bg: var(--tg-theme-bg-color, #ffffff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
             --text: var(--tg-theme-text-color, #000000);
-            --hint: var(--tg-theme-hint-color, #707579);
-            --btn: var(--tg-theme-button-color, #248bed);
+            --hint: var(--tg-theme-hint-color, #999999);
+            --btn: var(--tg-theme-button-color, #007aff);
             --btn-text: var(--tg-theme-button-text-color, #ffffff);
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
-        .nav { display: flex; justify-content: space-around; padding: 15px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: var(--bg); z-index: 10; }
-        .nav span { cursor: pointer; font-weight: 600; opacity: 0.7; }
-        .nav span.active { opacity: 1; color: var(--btn); border-bottom: 2px solid var(--btn); }
-        
-        .container { padding: 15px; }
-        .cat-list { display: flex; overflow-x: auto; gap: 8px; margin-bottom: 15px; padding-bottom: 5px; }
-        .cat-chip { background: #f0f0f0; padding: 6px 15px; border-radius: 20px; font-size: 14px; white-space: nowrap; color: #000; }
-        .cat-chip.active { background: var(--btn); color: white; }
 
-        .card { border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 12px; background: rgba(0,0,0,0.02); }
-        .price { color: var(--btn); font-weight: bold; font-size: 1.2em; margin: 8px 0; }
-        
-        button { background: var(--btn); color: var(--btn-text); border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--secondary-bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 80px; /* Отступ под нижнее меню */
+        }
+
+        /* Шапка */
+        .header {
+            background: var(--bg);
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        /* Категории */
+        .categories {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg);
+        }
+        .cat-badge {
+            background: var(--secondary-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            white-space: nowrap;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .cat-badge.active {
+            background: var(--btn);
+            color: var(--btn-text);
+        }
+
+        /* Сетка товаров */
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 12px;
+        }
+        .card {
+            background: var(--bg);
+            border-radius: 15px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .card-cat { font-size: 11px; color: var(--hint); text-transform: uppercase; }
+        .card-title { font-size: 15px; font-weight: 600; margin: 5px 0; height: 40px; overflow: hidden; }
+        .card-price { font-size: 17px; font-weight: bold; color: var(--btn); margin-bottom: 10px; }
+
+        /* Кнопки */
+        button {
+            background: var(--btn);
+            color: var(--btn-text);
+            border: none;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.7; }
+
+        /* Нижнее меню */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: var(--bg);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid rgba(0,0,0,0.1);
+            padding-bottom: calc(10px + var(--tg-safe-area-inset-bottom));
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 11px;
+            color: var(--hint);
+            cursor: pointer;
+            flex: 1;
+        }
+        .nav-item.active { color: var(--btn); }
+        .nav-icon { font-size: 20px; margin-bottom: 2px; }
+
+        /* Админка и формы */
+        .form-group { background: var(--bg); padding: 20px; border-radius: 15px; margin: 12px; }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 10px;
+            border: 1px solid var(--secondary-bg);
+            background: var(--secondary-bg);
+            color: var(--text);
+            box-sizing: border-box;
+        }
+
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
-<div class="nav">
-    <span id="tab-shop" class="active" onclick="showPage('shop')">Магазин</span>
-    <span id="tab-profile" onclick="showPage('profile')">Профиль</span>
-    <span id="tab-admin" class="hidden" onclick="showPage('admin')">Админ</span>
+<div class="header" id="page-title">Магазин</div>
+
+<div id="page-shop">
+    <div class="categories" id="cat-list"></div>
+    <div class="product-grid" id="prod-list">Загрузка...</div>
 </div>
 
-<div class="container">
-    <div id="page-shop">
-        <div class="cat-list" id="cat-container"></div>
-        <div id="prod-container">Загрузка товаров...</div>
-    </div>
-
-    <div id="page-profile" class="hidden">
+<div id="page-profile" class="hidden">
+    <div class="form-group">
         <h3>История заказов</h3>
-        <div id="history-container">Здесь будут ваши покупки</div>
+        <div id="order-history">Пока пусто</div>
     </div>
+</div>
 
-    <div id="page-admin" class="hidden">
-        <h3>Добавить новый товар</h3>
-        <input type="text" id="adm-name" placeholder="Название товара">
-        <input type="number" id="adm-price" placeholder="Цена (USDT)">
-        <input type="text" id="adm-cat" placeholder="Категория (Группа)">
-        <button onclick="dbSave()">Опубликовать для всех</button>
+<div id="page-admin" class="hidden">
+    <div class="form-group">
+        <h3>Новый товар</h3>
+        <input type="text" id="add-name" placeholder="Название">
+        <input type="number" id="add-price" placeholder="Цена (USDT)">
+        <input type="text" id="add-cat" placeholder="Категория">
+        <button onclick="saveToDB()" style="width: 100%;">Опубликовать</button>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <div class="nav-item active" id="nav-shop" onclick="showPage('shop')">
+        <span class="nav-icon">🛒</span><span>Магазин</span>
+    </div>
+    <div class="nav-item" id="nav-profile" onclick="showPage('profile')">
+        <span class="nav-icon">👤</span><span>Профиль</span>
+    </div>
+    <div class="nav-item hidden" id="nav-admin" onclick="showPage('admin')">
+        <span class="nav-icon">⚙️</span><span>Админ</span>
     </div>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
-    const MY_USERNAME = "z1krov"; 
+    const ADMIN_USER = "z1krov";
 
-    // ВСТАВЬ СВОИ ДАННЫЕ ИЗ FIREBASE СЮДА
+    // ТВОИ ДАННЫЕ FIREBASE
     const firebaseConfig = {
         apiKey: "AIzaSyBrsn0q_GE7gTxScGlQcLBzAH34uqr26qo",
-        authDomain: "shop24344-fa75f.firebaseapp.com", // замени PROJECT_ID
-        projectId: "shop24344-fa75f",                  // замени PROJECT_ID
-        storageBucket: "shop24344-fa75f.firebasestorage.app",   // замени PROJECT_ID
-        appId: "1:775096639365:web:78e6798f636945d8b66eec"                           // замени APP_ID
+        authDomain: "shop24344-fa75f.firebaseapp.com",
+        projectId: "shop24344-fa75f",
+        storageBucket: "shop24344-fa75f.firebasestorage.app",
+        appId: "1:775096639365:web:78e6798f636945d8b66eec"
     };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Проверка админа
-    if (tg.initDataUnsafe?.user?.username === MY_USERNAME) {
-        document.getElementById('tab-admin').classList.remove('hidden');
+    // Проверка на админа
+    if (tg.initDataUnsafe?.user?.username === ADMIN_USER) {
+        document.getElementById('nav-admin').classList.remove('hidden');
     }
 
     function showPage(page) {
         ['shop', 'profile', 'admin'].forEach(p => {
             document.getElementById('page-' + p).classList.toggle('hidden', p !== page);
-            document.getElementById('tab-' + p).classList.toggle('active', p === page);
+            document.getElementById('nav-' + p).classList.toggle('active', p === page);
         });
-        if (page === 'profile') renderHistory();
+        const titles = {shop: 'Магазин', profile: 'Мой профиль', admin: 'Панель управления'};
+        document.getElementById('page-title').innerText = titles[page];
+        if(page === 'profile') renderHistory();
     }
 
-    // Сохранение в базу (Админ)
-    async function dbSave() {
-        const name = document.getElementById('adm-name').value;
-        const price = document.getElementById('adm-price').value;
-        const cat = document.getElementById('adm-cat').value;
-
-        if (name && price && cat) {
-            await db.collection("products").add({ name, price: Number(price), cat });
-            alert("Товар добавлен!");
-            document.getElementById('adm-name').value = '';
-            document.getElementById('adm-price').value = '';
-            showPage('shop');
-        }
+    async function saveToDB() {
+        const name = document.getElementById('add-name').value;
+        const price = document.getElementById('add-price').value;
+        const cat = document.getElementById('add-cat').value;
+        if (!name || !price || !cat) return alert("Заполни все поля!");
+        
+        await db.collection("items").add({ name, price: Number(price), cat });
+        alert("Товар добавлен!");
+        document.getElementById('add-name').value = '';
+        showPage('shop');
     }
 
-    // Загрузка товаров
     function loadData() {
-        db.collection("products").onSnapshot((snapshot) => {
-            const prods = [];
+        db.collection("items").onSnapshot(snap => {
+            const items = [];
             const cats = new Set(["Все"]);
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                prods.push(data);
-                cats.add(data.cat);
+            snap.forEach(doc => {
+                items.push(doc.data());
+                cats.add(doc.data().cat);
             });
+            window.allData = items;
             renderCats(Array.from(cats));
-            renderProds(prods);
+            renderItems(items);
         });
     }
 
     function renderCats(cats) {
-        const container = document.getElementById('cat-container');
-        container.innerHTML = cats.map(c => `<div class="cat-chip" onclick="filterBy('${c}')">${c}</div>`).join('');
+        document.getElementById('cat-list').innerHTML = cats.map(c => 
+            `<div class="cat-badge" onclick="filterBy('${c}', this)">${c}</div>`
+        ).join('');
     }
 
-    function renderProds(list) {
-        const container = document.getElementById('prod-container');
-        container.innerHTML = list.map(p => `
+    function renderItems(list) {
+        document.getElementById('prod-list').innerHTML = list.map(i => `
             <div class="card">
-                <small>${p.cat}</small>
-                <div style="font-weight:bold; margin-top:4px;">${p.name}</div>
-                <div class="price">${p.price} USDT</div>
-                <button onclick="buyAction('${p.name}', ${p.price})">Купить</button>
+                <span class="card-cat">${i.cat}</span>
+                <div class="card-title">${i.name}</div>
+                <div class="card-price">${i.price} USDT</div>
+                <button onclick="buyNow('${i.name}', ${i.price})">Купить</button>
             </div>
         `).join('');
-        window.allProds = list;
     }
 
-    function filterBy(cat) {
-        if (cat === "Все") renderProds(window.allProds);
-        else renderProds(window.allProds.filter(p => p.cat === cat));
+    function filterBy(cat, el) {
+        document.querySelectorAll('.cat-badge').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        if (cat === "Все") renderItems(window.allData);
+        else renderItems(window.allData.filter(i => i.cat === cat));
     }
 
-    function buyAction(name, price) {
-        // Сохраняем в локальную историю
-        let orders = JSON.parse(localStorage.getItem('my_orders') || "[]");
-        orders.push({ name, price, date: new Date().toLocaleDateString() });
-        localStorage.setItem('my_orders', JSON.stringify(orders));
+    function buyNow(name, price) {
+        let history = JSON.parse(localStorage.getItem('orders') || "[]");
+        history.push({ name, price, date: new Date().toLocaleDateString() });
+        localStorage.setItem('orders', JSON.stringify(history));
 
-        // Ссылка в ЛС к тебе
-        const text = `Привет z1krov! Купил товар: ${name}. Сумма: ${price} USDT. Проверь оплату.`;
-        tg.openTelegramLink(`https://t.me/${MY_USERNAME}?text=${encodeURIComponent(text)}`);
+        const msg = `Привет z1krov! Покупаю: ${name} за ${price} USDT.`;
+        tg.openTelegramLink(`https://t.me/${ADMIN_USER}?text=${encodeURIComponent(msg)}`);
     }
 
     function renderHistory() {
-        const orders = JSON.parse(localStorage.getItem('my_orders') || "[]");
-        const container = document.getElementById('history-container');
-        if (orders.length === 0) return;
-        container.innerHTML = orders.reverse().map(o => `
-            <div style="padding:10px; border-bottom:1px solid #eee;">
+        const h = JSON.parse(localStorage.getItem('orders') || "[]");
+        document.getElementById('order-history').innerHTML = h.length ? h.reverse().map(o => 
+            `<div style="margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
                 <b>${o.name}</b><br><small>${o.date} — ${o.price} USDT</small>
-            </div>
-        `).join('');
+            </div>`
+        ).join('') : "Заказов нет";
     }
 
     loadData();
     tg.expand();
+    tg.ready();
 </script>
 </body>
 </html>
